@@ -1,0 +1,27 @@
+# Secrets — never commit JWTs or local key files
+.env
+.env.*
+apiKey.txt
+**/apiKey.txt
+*.jwt
+*.pem
+secrets/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
