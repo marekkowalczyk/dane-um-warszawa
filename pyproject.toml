@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dane-um-warszawa"
+version = "0.1.0"
+description = "Thin universal Python client and CLI for the City of Warsaw Open Data ZTM API (dane.um.warszawa.pl)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Marek Kowalczyk" }]
+keywords = ["warsaw", "ztm", "opendata", "transport", "dane.um.warszawa.pl"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/marekkowalczyk/dane-um-warszawa"
+Repository = "https://github.com/marekkowalczyk/dane-um-warszawa"
+
+[project.scripts]
+dane-um = "dane_um_warszawa.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dane_um_warszawa = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
