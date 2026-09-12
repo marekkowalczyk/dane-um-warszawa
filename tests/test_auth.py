@@ -42,16 +42,22 @@ class LoadApiKeyTests(unittest.TestCase):
                 self.assertEqual(load_api_key(api_key="  arg-key  "), "arg-key")
 
     def test_env_um_warszawa_api_key(self) -> None:
-        with patch.dict(os.environ, {"UM_WARSZAWA_API_KEY": f"  {FAKE_JWT}  "}, clear=False):
-            os.environ.pop("DANE_UM_KEY_FILE", None)
+        env = {
+            "UM_WARSZAWA_API_KEY": f"  {FAKE_JWT}  ",
+            "DANE_UM_KEY_FILE": "",
+        }
+        with patch.dict(os.environ, env, clear=False):
             self.assertEqual(load_api_key(), FAKE_JWT)
 
     def test_key_file_env_and_default_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             key_file = Path(tmp) / "apiKey.txt"
             key_file.write_text(f"{FAKE_JWT}\n", encoding="utf-8")
-            with patch.dict(os.environ, {"DANE_UM_KEY_FILE": str(key_file)}, clear=False):
-                os.environ.pop("UM_WARSZAWA_API_KEY", None)
+            env = {
+                "DANE_UM_KEY_FILE": str(key_file),
+                "UM_WARSZAWA_API_KEY": "",
+            }
+            with patch.dict(os.environ, env, clear=False):
                 self.assertEqual(load_api_key(), FAKE_JWT)
 
     def test_explicit_key_file_argument(self) -> None:

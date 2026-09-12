@@ -7,7 +7,6 @@ import json
 import sys
 from datetime import datetime
 from typing import Any, Sequence
-from zoneinfo import ZoneInfo
 
 from .auth import MissingApiKey
 from .client import ZtmClient
@@ -17,18 +16,18 @@ ATTRIBUTION = (
     "Źródło: Miasto Stołeczne Warszawa / Urząd m.st. Warszawy — "
     "https://dane.um.warszawa.pl"
 )
-WARSAW_TZ = ZoneInfo("Europe/Warsaw")
-
-
 def _warsaw_now() -> str:
-    now = datetime.now(WARSAW_TZ)
-    return f"{now.strftime('%Y-%m-%d %H:%M:%S')} {WARSAW_TZ.key}"
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Europe/Warsaw")
+    now = datetime.now(tz)
+    return f"{now.strftime('%Y-%m-%d %H:%M:%S')} Europe/Warsaw"
 
 
 def _print_footer() -> None:
-    print()
-    print(ATTRIBUTION)
-    print(_warsaw_now())
+    # Attribution stays on stderr so --json stdout remains parseable.
+    print(ATTRIBUTION, file=sys.stderr)
+    print(_warsaw_now(), file=sys.stderr)
 
 
 def _format_record(record: dict[str, Any]) -> str:
@@ -76,37 +75,56 @@ def _cmd_vehicle_locations(client: ZtmClient, args: argparse.Namespace) -> int:
     return 0
 
 
+def _common_flags() -> argparse.ArgumentParser:
+    flags = argparse.ArgumentParser(add_help=False)
+    flags.add_argument(
+        "--key-file",
+        help="JWT file (default: DANE_UM_KEY_FILE or ~/Downloads/apiKey.txt)",
+    )
+    flags.add_argument(
+        "--json",
+        action="store_true",
+        help="Print records as JSON (attribution goes to stderr)",
+    )
+    return flags
+
+
 def _build_parser() -> argparse.ArgumentParser:
+    flags = _common_flags()
     parser = argparse.ArgumentParser(
         prog="dane-um",
         description=(
             "Universal client for the City of Warsaw Open Data ZTM API "
             "(dane.um.warszawa.pl). Not the legacy api.um.warszawa.pl UUID API."
         ),
-    )
-    parser.add_argument(
-        "--key-file",
-        help="JWT file (default: DANE_UM_KEY_FILE or ~/Downloads/apiKey.txt)",
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Print records as JSON before the attribution footer",
+        parents=[flags],
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    lines = sub.add_parser("lines-at-stop", help="Lines serving a stop pole")
+    lines = sub.add_parser(
+        "lines-at-stop",
+        help="Lines serving a stop pole",
+        parents=[flags],
+    )
     lines.add_argument("busstop_id", help="Stop group id (busstopId), e.g. 1001")
     lines.add_argument("busstop_nr", help="Pole number (busstopNr), e.g. 01")
     lines.set_defaults(func=_cmd_lines_at_stop)
 
-    deps = sub.add_parser("departures", help="Departures of a line from a stop pole")
+    deps = sub.add_parser(
+        "departures",
+        help="Departures of a line from a stop pole",
+        parents=[flags],
+    )
     deps.add_argument("busstop_id", help="Stop group id (busstopId)")
     deps.add_argument("busstop_nr", help="Pole number (busstopNr)")
     deps.add_argument("line", help="Line id, e.g. 157 or N11")
     deps.set_defaults(func=_cmd_departures)
 
-    veh = sub.add_parser("vehicle-locations", help="Live bus (1) or tram (2) positions")
+    veh = sub.add_parser(
+        "vehicle-locations",
+        help="Live bus (1) or tram (2) positions",
+        parents=[flags],
+    )
     veh.add_argument(
         "vehicle_type",
         help="1/bus/buses or 2/tram/trams",

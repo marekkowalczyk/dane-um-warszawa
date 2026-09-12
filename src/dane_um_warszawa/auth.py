@@ -45,13 +45,14 @@ def load_api_key(*, api_key: str | None = None, key_file: str | Path | None = No
 
 def _read_key_file(path: Path) -> str:
     path = path.expanduser()
+    hint = (
+        "Set UM_WARSZAWA_API_KEY, or put the token in --key-file / DANE_UM_KEY_FILE "
+        f"(default {DEFAULT_KEY_FILE}). Get a key at "
+        "https://dane.um.warszawa.pl/pl/key-api"
+    )
     if path.is_file():
         text = path.read_text(encoding="utf-8").strip()
         if text:
             return text
-    raise MissingApiKey(
-        "No dane.um.warszawa.pl JWT found. Set UM_WARSZAWA_API_KEY, "
-        "or put the token in DANE_UM_KEY_FILE "
-        f"(default {DEFAULT_KEY_FILE}). Get a key at "
-        "https://dane.um.warszawa.pl/pl/key-api"
-    )
+        raise MissingApiKey(f"Key file {path} is empty. {hint}")
+    raise MissingApiKey(f"No dane.um.warszawa.pl JWT found (looked in {path}). {hint}")

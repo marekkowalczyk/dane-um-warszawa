@@ -33,6 +33,8 @@ def _as_stop_id(value: Any) -> str:
 
 
 def _as_stop_nr(value: Any) -> str:
+    if isinstance(value, bool):
+        return str(value)
     if isinstance(value, int):
         return f"{value:02d}"
     text = str(value).strip()
@@ -104,14 +106,20 @@ class ZtmClient:
         url = f"{self._base_url}/api/action/{action}"
         data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         request = Request(url, data=data, method="POST")
-        request.add_header("Authorization", self._api_key)
+        # Keep the JWT off redirect follow-ups (urllib copies add_header values).
+        request.add_unredirected_header("Authorization", self._api_key)
         request.add_header("Content-Type", "application/json")
         request.add_header("Accept", "application/json")
+        request.add_header("User-Agent", "dane-um-warszawa/0.1.0")
         try:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:
                 raw = response.read()
         except urllib.error.HTTPError as exc:
             status = getattr(exc, "code", None)
+            try:
+                exc.close()
+            except Exception:
+                pass
             raise ApiError(f"HTTP {status} from {url}") from None
         except urllib.error.URLError as exc:
             raise ApiError(f"Network error calling {url}: {exc.reason}") from None

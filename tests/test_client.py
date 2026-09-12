@@ -58,10 +58,12 @@ class ClientHttpTests(unittest.TestCase):
             req.full_url,
             f"{DEFAULT_BASE_URL}/api/action/{ACTION_LINES_AT_STOP}",
         )
-        self.assertEqual(req.get_header("Authorization"), FAKE_JWT)
-        self.assertFalse(req.get_header("Authorization").lower().startswith("bearer"))
-        self.assertNotIn("token ", req.get_header("Authorization").lower())
-        self.assertEqual(req.get_header("Content-type"), "application/json")
+        headers = {key.lower(): value for key, value in req.header_items()}
+        self.assertEqual(headers["authorization"], FAKE_JWT)
+        self.assertFalse(headers["authorization"].lower().startswith("bearer"))
+        self.assertNotIn("token ", headers["authorization"].lower())
+        self.assertEqual(headers["content-type"], "application/json")
+        self.assertEqual(req.unredirected_hdrs.get("Authorization"), FAKE_JWT)
         self.assertEqual(
             json.loads(req.data.decode("utf-8")),
             {"busstopId": "1001", "busstopNr": "01"},

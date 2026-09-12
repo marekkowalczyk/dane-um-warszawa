@@ -86,8 +86,13 @@ dane-um vehicle-locations bus
 dane-um vehicle-locations 2
 ```
 
-`--json` prints the records as JSON. Every command ends with attribution and
-the current time in `Europe/Warsaw`.
+`--json` prints records as JSON on stdout (attribution still goes to stderr).
+Flags work before or after the subcommand:
+
+```bash
+dane-um lines-at-stop 1001 01 --json
+dane-um --key-file ~/Downloads/apiKey.txt departures 1001 01 523
+```
 
 ### Specimen only: Piaski 03
 

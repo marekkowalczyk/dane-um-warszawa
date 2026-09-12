@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import unittest
 from contextlib import redirect_stdout
 from io import BytesIO
@@ -34,25 +35,35 @@ class FakeHTTPResponse:
         return None
 
 
+def _auth_header(req: Request) -> str:
+    headers = {key.lower(): value for key, value in req.header_items()}
+    return headers["authorization"]
+
+
 class CliTests(unittest.TestCase):
+    def _run(self, argv: list[str], fake_urlopen):
+        out = io.StringIO()
+        err = io.StringIO()
+        with patch.dict("os.environ", {"UM_WARSZAWA_API_KEY": FAKE_JWT}, clear=False):
+            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+                with redirect_stdout(out), patch("sys.stderr", err):
+                    code = main(argv)
+        return code, out.getvalue(), err.getvalue()
+
     def test_lines_at_stop_prints_lines_attribution_and_warsaw_time(self) -> None:
         def fake_urlopen(req: Request, timeout: float | None = None):
             self.assertTrue(req.full_url.endswith(ACTION_LINES_AT_STOP))
-            self.assertEqual(req.get_header("Authorization"), FAKE_JWT)
+            self.assertEqual(_auth_header(req), FAKE_JWT)
             return FakeHTTPResponse({"result": [{"linia": "157"}, {"linia": "523"}]})
 
-        buf = io.StringIO()
-        with patch.dict("os.environ", {"UM_WARSZAWA_API_KEY": FAKE_JWT}, clear=False):
-            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-                with redirect_stdout(buf):
-                    code = main(["lines-at-stop", "1001", "01"])
+        code, out, err = self._run(["lines-at-stop", "1001", "01"], fake_urlopen)
         self.assertEqual(code, 0)
-        out = buf.getvalue()
         self.assertIn("157", out)
         self.assertIn("523", out)
-        self.assertIn(ATTRIBUTION, out)
-        self.assertIn(WARSAW_TZ, out)
-        self.assertNotIn(FAKE_JWT, out)
+        self.assertIn(ATTRIBUTION, err)
+        self.assertIn(WARSAW_TZ, err)
+        self.assertNotIn(ATTRIBUTION, out)
+        self.assertNotIn(FAKE_JWT, out + err)
 
     def test_departures_command(self) -> None:
         def fake_urlopen(req: Request, timeout: float | None = None):
@@ -62,17 +73,12 @@ class CliTests(unittest.TestCase):
                 {"result": [{"czas": "09:00:00", "kierunek": "Wilków"}]}
             )
 
-        buf = io.StringIO()
-        with patch.dict("os.environ", {"UM_WARSZAWA_API_KEY": FAKE_JWT}, clear=False):
-            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-                with redirect_stdout(buf):
-                    code = main(["departures", "3003", "02", "191"])
+        code, out, err = self._run(["departures", "3003", "02", "191"], fake_urlopen)
         self.assertEqual(code, 0)
-        out = buf.getvalue()
         self.assertIn("09:00:00", out)
         self.assertIn("Wilków", out)
-        self.assertIn(ATTRIBUTION, out)
-        self.assertNotIn(FAKE_JWT, out)
+        self.assertIn(ATTRIBUTION, err)
+        self.assertNotIn(FAKE_JWT, out + err)
 
     def test_vehicle_locations_command(self) -> None:
         def fake_urlopen(req: Request, timeout: float | None = None):
@@ -82,22 +88,32 @@ class CliTests(unittest.TestCase):
                 {"result": [{"Lines": "17", "Lat": 52.2, "Lon": 21.0}]}
             )
 
-        buf = io.StringIO()
-        with patch.dict("os.environ", {"UM_WARSZAWA_API_KEY": FAKE_JWT}, clear=False):
-            with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-                with redirect_stdout(buf):
-                    code = main(["vehicle-locations", "tram"])
+        code, out, err = self._run(["vehicle-locations", "tram"], fake_urlopen)
         self.assertEqual(code, 0)
-        out = buf.getvalue()
         self.assertIn("17", out)
-        self.assertIn(ATTRIBUTION, out)
+        self.assertIn(ATTRIBUTION, err)
+
+    def test_json_flag_after_subcommand_is_parseable(self) -> None:
+        def fake_urlopen(req: Request, timeout: float | None = None):
+            return FakeHTTPResponse({"result": [{"linia": "157"}]})
+
+        code, out, err = self._run(
+            ["lines-at-stop", "1001", "01", "--json"],
+            fake_urlopen,
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out), ["157"])
+        self.assertIn(ATTRIBUTION, err)
+        self.assertNotIn(ATTRIBUTION, out)
 
     def test_missing_key_exits_nonzero_without_secret(self) -> None:
-        import os
-
         buf = io.StringIO()
         err = io.StringIO()
-        env = {k: v for k, v in os.environ.items() if k not in {"UM_WARSZAWA_API_KEY", "DANE_UM_KEY_FILE"}}
+        env = {
+            k: v
+            for k, v in os.environ.items()
+            if k not in {"UM_WARSZAWA_API_KEY", "DANE_UM_KEY_FILE"}
+        }
         env["DANE_UM_KEY_FILE"] = "/tmp/missing-dane-um-key"
         with patch.dict("os.environ", env, clear=True):
             with redirect_stdout(buf), patch("sys.stderr", err):
@@ -105,6 +121,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertNotIn(FAKE_JWT, err.getvalue() + buf.getvalue())
         self.assertIn("UM_WARSZAWA_API_KEY", err.getvalue())
+        self.assertIn("/tmp/missing-dane-um-key", err.getvalue())
 
 
 if __name__ == "__main__":
